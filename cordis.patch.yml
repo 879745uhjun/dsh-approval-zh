@@ -1,0 +1,14 @@
+# dsh-approval-zh — display-only Chinese translation for approval prompts.
+#
+# The row is inserted by the bundle layer. It never changes approval outcomes:
+# it rewrites the browser-visible reason before the approval request leaves the
+# Host, then the original waterfall continues unchanged.
+- insert:
+    - id: dsh-approval-zh
+      name: dsh-approval-zh
+      config:
+        enabled: true
+        target: zh-Hans
+        timeoutMs: 3000
+        translateReason: true
+        translateDisplayReason: true

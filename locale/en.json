@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Approval prompt Chinese translation",
+    "description": "Automatically translates English approval prompt text into Chinese, preserving tool names, JSON arguments, and sandbox modes. Approval decisions are never changed."
+  }
+}
