@@ -100,6 +100,7 @@ Override the row with id `dsh-approval-zh` in the profile's `cordis.patch.yml`:
 - Only the approval title/description is translated. Command bodies, the tool-detail panel, and button labels follow DSH's own locale setting.
 - Code, JSON, paths, URLs, and tool names are intentionally not translated.
 - Translation adds up to `timeoutMs` of display latency; cached prompts are effectively instant.
+- An already-open approval prompt is never updated retroactively. If a source update still behaves like the old version, restart DSH to clear the loaded Host module cache.
 
 ## Development
 

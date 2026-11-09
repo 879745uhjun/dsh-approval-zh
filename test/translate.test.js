@@ -250,3 +250,22 @@ test('a slow anonymous endpoint is raced by the model', async () => {
     globalThis.fetch = originalFetch
   }
 })
+
+test('translateApprovalRequest localizes the Auto review brand', async () => {
+  const translator = {
+    async translate() {
+      return '用户仅要求写配置文件。'
+    },
+  }
+  const request = {
+    displayReason: {
+      zh: 'Auto review 拒绝了此调用：The user asked only to write the config file.',
+    },
+  }
+  const changed = await translateApprovalRequest(request, translator, {
+    translateDisplayReason: true,
+    translateReason: true,
+  })
+  assert.equal(changed, true)
+  assert.equal(request.displayReason, '自动审查拒绝了此调用：用户仅要求写配置文件。')
+})
