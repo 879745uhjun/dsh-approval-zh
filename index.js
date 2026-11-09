@@ -69,13 +69,14 @@ export function normalizeConfig(input) {
 export function apply(ctx, input) {
   const config = normalizeConfig(input)
   if (!config.enabled) return
-  let llm
-  try {
-    llm = ctx.get('llm')
-  } catch {
-    llm = undefined
+  const getLlm = () => {
+    try {
+      return ctx.get('llm')
+    } catch {
+      return undefined
+    }
   }
-  const translator = createTranslator(config, { llm })
+  const translator = createTranslator(config, { getLlm })
   ctx.on(
     'approval/request',
     async (request, next) => {
@@ -92,7 +93,7 @@ export function apply(ctx, input) {
   )
   if (config.debug) {
     console.log(
-      `[dsh-approval-zh] loaded; target=${config.target}, timeout=${config.timeoutMs}ms, llm=${config.useLlm && llm !== undefined}`,
+      `[dsh-approval-zh] loaded; target=${config.target}, timeout=${config.timeoutMs}ms, llm=${config.useLlm && getLlm() !== undefined}`,
     )
   }
 }
