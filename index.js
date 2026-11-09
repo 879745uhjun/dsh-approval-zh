@@ -21,7 +21,9 @@ export const inject = ['approval']
 const DEFAULTS = Object.freeze({
   enabled: true,
   target: 'zh-Hans',
-  timeoutMs: 3000,
+  timeoutMs: 8000,
+  llmDelayMs: 1200,
+  useLlm: true,
   maxTextChars: 4000,
   translateReason: true,
   translateDisplayReason: true,
@@ -41,7 +43,9 @@ export function normalizeConfig(input) {
       typeof source.target === 'string' && source.target.trim().length > 0
         ? source.target.trim()
         : DEFAULTS.target,
-    timeoutMs: clamp(Number(source.timeoutMs), 500, 15000, DEFAULTS.timeoutMs),
+    timeoutMs: clamp(Number(source.timeoutMs), 1000, 20000, DEFAULTS.timeoutMs),
+    llmDelayMs: clamp(Number(source.llmDelayMs), 200, 5000, DEFAULTS.llmDelayMs),
+    useLlm: source.useLlm !== false,
     maxTextChars: clamp(Number(source.maxTextChars), 200, 12000, DEFAULTS.maxTextChars),
     translateReason: source.translateReason !== false,
     translateDisplayReason: source.translateDisplayReason !== false,
@@ -65,7 +69,13 @@ export function normalizeConfig(input) {
 export function apply(ctx, input) {
   const config = normalizeConfig(input)
   if (!config.enabled) return
-  const translator = createTranslator(config)
+  let llm
+  try {
+    llm = ctx.get('llm')
+  } catch {
+    llm = undefined
+  }
+  const translator = createTranslator(config, { llm })
   ctx.on(
     'approval/request',
     async (request, next) => {
@@ -81,7 +91,9 @@ export function apply(ctx, input) {
     { prepend: true },
   )
   if (config.debug) {
-    console.log(`[dsh-approval-zh] loaded; target=${config.target}, timeout=${config.timeoutMs}ms`)
+    console.log(
+      `[dsh-approval-zh] loaded; target=${config.target}, timeout=${config.timeoutMs}ms, llm=${config.useLlm && llm !== undefined}`,
+    )
   }
 }
 

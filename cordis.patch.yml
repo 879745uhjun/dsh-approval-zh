@@ -9,6 +9,8 @@
       config:
         enabled: true
         target: zh-Hans
-        timeoutMs: 3000
+        timeoutMs: 8000
+        llmDelayMs: 1200
+        useLlm: true
         translateReason: true
         translateDisplayReason: true

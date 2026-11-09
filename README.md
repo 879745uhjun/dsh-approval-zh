@@ -30,7 +30,8 @@ The Chinese prefix, tool names, JSON arguments, and sandbox mode names are prese
   - tool names such as `plugin_manager` and `ops_bash`;
   - JSON/command arguments, inline code, URLs, Windows paths, and sandbox mode names.
 - Caches identical text in memory.
-- On timeout, network failure, or a malformed response, shows the original text and lets the approval continue. It never blocks or denies a call.
+- Starts with the anonymous Bing endpoint. If it is slower than `llmDelayMs` or fails, the current session model races it; the first successful translation wins and the other request is aborted.
+- If both paths fail, shows the original text and lets the approval continue. It never blocks or denies a call.
 - Does not modify `approval/asked` / `approval/decided` audit records; they keep the original English reason.
 
 ## Install
@@ -63,7 +64,9 @@ Override the row with id `dsh-approval-zh` in the profile's `cordis.patch.yml`:
   config:
     enabled: true
     target: zh-Hans
-    timeoutMs: 3000
+    timeoutMs: 8000
+    llmDelayMs: 1200
+    useLlm: true
     translateReason: true
     translateDisplayReason: true
     debug: false
@@ -73,7 +76,9 @@ Override the row with id `dsh-approval-zh` in the profile's `cordis.patch.yml`:
 | --- | --- | --- |
 | `enabled` | `true` | Master switch; `false` loads no listener. |
 | `target` | `zh-Hans` | Target language passed to the translation endpoint. |
-| `timeoutMs` | `3000` | Per-request timeout; the original text is shown on timeout. |
+| `timeoutMs` | `8000` | Overall deadline for the Bing/model race; the original text is shown on timeout. |
+| `llmDelayMs` | `1200` | Start the current-session model if Bing has not answered by then. |
+| `useLlm` | `true` | Allow the current-session model as fallback; `false` uses Bing only. |
 | `maxTextChars` | `4000` | Text longer than this is left untranslated. |
 | `translateReason` | `true` | Translate the `reason` fallback when `displayReason` is absent. |
 | `translateDisplayReason` | `true` | Translate the `displayReason` rendered by the approval card. |
@@ -83,14 +88,15 @@ Override the row with id `dsh-approval-zh` in the profile's `cordis.patch.yml`:
 ## Privacy
 
 - Sends only the approval sentence that needs translation to Microsoft Edge's anonymous translation endpoint (`edge.microsoft.com`). No account or API key is required.
+- If Bing is slower than `llmDelayMs` or fails, the same sentence is sent to the model already used by the current session as a fallback; this consumes a small number of model tokens. Set `useLlm: false` to disable.
 - Does not send file contents, full sessions, credentials, or tool results.
 - The original English reason remains in DSH's audit log; only the browser display is rewritten.
 - Set `enabled: false` to disable all network access.
 
 ## Limitations
 
-- Requires network access to `edge.microsoft.com`; otherwise the English text is shown.
-- The anonymous endpoint may rate-limit or change its protocol; failures fall back to the original text.
+- Prefers `edge.microsoft.com`; if it is slow or unavailable, the current-session model is used. Only when both fail (or `useLlm: false` and Bing is unavailable) is the English text shown.
+- A slow Bing response can trigger a model call, adding a small token cost and 1–3 seconds of latency.
 - Only the approval title/description is translated. Command bodies, the tool-detail panel, and button labels follow DSH's own locale setting.
 - Code, JSON, paths, URLs, and tool names are intentionally not translated.
 - Translation adds up to `timeoutMs` of display latency; cached prompts are effectively instant.

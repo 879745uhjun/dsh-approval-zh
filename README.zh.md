@@ -30,7 +30,8 @@
   - 工具名，例如 `plugin_manager`、`ops_bash`；
   - JSON / 命令参数、反引号代码、URL、Windows 路径、`danger-full-access` 等模式名。
 - 内存缓存相同文案，避免每次审批都请求翻译。
-- 翻译失败、超时或断网时**显示原文并继续审批**，不会阻塞、不会拒绝调用。
+- 先请求匿名 Bing 端点；如果它超过 `llmDelayMs` 还没返回或直接失败，会同时用**当前会话的模型**翻译，谁先成功用谁，另一个立即取消。这样 Bing 慢或不可用时不会一直显示英文。
+- 两条通道都失败时**显示原文并继续审批**，不会阻塞、不会拒绝调用。
 - 不会修改 `approval/asked` / `approval/decided` 审计记录；审计里仍是原始英文。
 
 ## 安装
@@ -68,7 +69,9 @@ dsh plugin --profile desktop add "D:\plugins\dsh-approval-zh"
   config:
     enabled: true
     target: zh-Hans
-    timeoutMs: 3000
+    timeoutMs: 8000
+    llmDelayMs: 1200
+    useLlm: true
     translateReason: true
     translateDisplayReason: true
     debug: false
@@ -78,7 +81,9 @@ dsh plugin --profile desktop add "D:\plugins\dsh-approval-zh"
 | --- | --- | --- |
 | `enabled` | `true` | 总开关；设为 `false` 后完全不加载监听器。 |
 | `target` | `zh-Hans` | 目标语言，传给翻译端点。 |
-| `timeoutMs` | `3000` | 单次翻译超时；超时显示原文。 |
+| `timeoutMs` | `8000` | 整次翻译（Bing + 模型竞速）的总超时；超时显示原文。 |
+| `llmDelayMs` | `1200` | Bing 超过这个时间还没返回时，启动当前会话模型一起翻译。 |
+| `useLlm` | `true` | 是否允许用当前会话模型兜底；设为 `false` 则只走 Bing。 |
 | `maxTextChars` | `4000` | 超过此长度的文案不翻译，直接显示原文。 |
 | `translateReason` | `true` | 没有 `displayReason` 时，翻译 `reason` 兜底。 |
 | `translateDisplayReason` | `true` | 翻译审批卡片实际显示的 `displayReason`。 |
@@ -87,15 +92,16 @@ dsh plugin --profile desktop add "D:\plugins\dsh-approval-zh"
 
 ## 隐私
 
-- 只会把**需要翻译的那段审批说明**发送到 Microsoft Edge 的匿名翻译端点（`edge.microsoft.com`），不需要账号或 API Key。
+- 优先把**需要翻译的那段审批说明**发送到 Microsoft Edge 的匿名翻译端点（`edge.microsoft.com`），不需要账号或 API Key。
+- 如果 Bing 超过 `llmDelayMs` 未返回或失败，同一段文本会发给**当前会话使用的模型**做兜底翻译；这会消耗少量模型 token。把 `useLlm` 设为 `false` 可关闭。
 - 不会发送文件内容、完整会话、凭据或工具执行结果。
 - 只是显示层改写；原始审批理由仍保存在 DSH 的审计日志里。
 - 如果不想联网，把 `enabled` 设为 `false` 即可；插件没有本地模型。
 
 ## 已知限制
 
-- 需要能访问 `edge.microsoft.com`；网络受限时会显示英文原文。
-- 匿名端点可能限流或调整协议，失败时自动回退原文。
+- 优先使用 `edge.microsoft.com`；Bing 慢或失败时会自动用当前会话模型兜底。只有两者都失败（或设置 `useLlm: false` 且 Bing 不可用）才显示英文原文。
+- Bing 超过 `llmDelayMs` 会触发模型翻译，可能产生少量 token 费用和额外 1–3 秒延迟。
 - 只翻译审批卡片的标题/说明；命令正文、工具详情面板、按钮文字跟随 DSH 自身的界面语言设置，不在本插件范围内。
 - 不翻译代码、JSON、路径、URL 和工具名；这些内容保持原样是有意设计。
 - 翻译会增加最多 `timeoutMs` 的显示延迟；命中缓存后基本无感。
