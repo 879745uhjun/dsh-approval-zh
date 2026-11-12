@@ -10,7 +10,11 @@
  * @module dsh-approval-zh
  */
 
-import { createTranslator, translateApprovalRequest } from './lib/translate.js'
+import {
+  createTranslator,
+  translateApprovalRequest,
+  translateUserQuestionRequest,
+} from './lib/translate.js'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'dsh-approval-zh'
@@ -27,6 +31,7 @@ const DEFAULTS = Object.freeze({
   maxTextChars: 4000,
   translateReason: true,
   translateDisplayReason: true,
+  translateUserQuestions: true,
   debug: false,
 })
 
@@ -49,6 +54,7 @@ export function normalizeConfig(input) {
     maxTextChars: clamp(Number(source.maxTextChars), 200, 12000, DEFAULTS.maxTextChars),
     translateReason: source.translateReason !== false,
     translateDisplayReason: source.translateDisplayReason !== false,
+    translateUserQuestions: source.translateUserQuestions !== false,
     debug: source.debug === true,
     glossary:
       source.glossary !== null && typeof source.glossary === 'object' && !Array.isArray(source.glossary)
@@ -91,6 +97,22 @@ export function apply(ctx, input) {
     },
     { prepend: true },
   )
+  if (config.translateUserQuestions) {
+    ctx.on(
+      'user-questions/request',
+      async (request, next) => {
+        try {
+          await translateUserQuestionRequest(request, translator, config)
+        } catch (error) {
+          if (config.debug) {
+            console.warn('[dsh-approval-zh] question translation skipped:', error?.message ?? error)
+          }
+        }
+        return next()
+      },
+      { prepend: true },
+    )
+  }
   if (config.debug) {
     console.log(
       `[dsh-approval-zh] loaded; target=${config.target}, timeout=${config.timeoutMs}ms, llm=${config.useLlm && getLlm() !== undefined}`,

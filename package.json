@@ -1,7 +1,7 @@
 {
   "name": "dsh-approval-zh",
-  "version": "0.1.1",
-  "description": "Automatically translate DeepSeek Harness approval prompt text to Chinese without changing approval decisions, with a model fallback when the anonymous endpoint is slow.",
+  "version": "0.2.0",
+  "description": "Automatically translate DeepSeek Harness approval prompts and ask_user_question cards to Chinese without changing decisions or option answer values.",
   "keywords": [
     "dsh",
     "dsh-plugin",

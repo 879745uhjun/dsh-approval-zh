@@ -1,8 +1,8 @@
 # dsh-approval-zh
 
-自动把 **DeepSeek Harness（DSH）审批提示里的英文说明**翻译成中文。
+自动把 **DeepSeek Harness（DSH）审批提示**和 **`ask_user_question` 问答卡**里的英文说明翻译成中文。
 
-它只改“显示文案”，**不改变审批结果**：原来要你点的“允许一次 / 拒绝”，现在仍然由你决定；插件不会自动批准、自动拒绝，也不会替你做任何决定。
+它只改“显示文案”，**不改变任何决定或答案**：审批仍然由你点击“允许一次 / 拒绝”，问答卡选项仍然以原始英文标签回传给模型；插件不会自动批准、自动拒绝，也不会替你做任何决定。
 
 [English](README.md) | 中文
 
@@ -22,9 +22,26 @@
 
 中文前缀、工具名、JSON 参数和权限模式都会原样保留。
 
+问答卡原本是英文题干和英文选项：
+
+```text
+Which repo?
+1. It's private — I'll provide a token or make it public
+   Anonymous requests can't read private repos; a read-only PAT would let me clone and summarize it.
+```
+
+安装后，题干和选项说明变中文，**选项标签保持英文**：
+
+```text
+你说的是哪个仓库？
+1. It's private — I'll provide a token or make it public
+   匿名请求无法读取私有仓库；一个只读 PAT 可以让我克隆并总结它。
+```
+
 ## 它做什么
 
 - 监听 Host 的 `approval/request` 瀑布事件，在请求发给浏览器之前改写 `displayReason`（没有时改写 `reason`）。
+- 监听 `user-questions/request`，翻译 `ask_user_question` 问答卡的题干、可选标题和选项说明；**选项标签不翻译**，因为它是回传给模型的答案值。
 - 只翻译英文部分，保留：
   - 中文提示前缀，例如“允许本次操作使用 danger-full-access 权限：”；
   - 工具名，例如 `plugin_manager`、`ops_bash`；
@@ -74,6 +91,7 @@ dsh plugin --profile desktop add "D:\plugins\dsh-approval-zh"
     useLlm: true
     translateReason: true
     translateDisplayReason: true
+    translateUserQuestions: true
     debug: false
 ```
 
@@ -87,12 +105,13 @@ dsh plugin --profile desktop add "D:\plugins\dsh-approval-zh"
 | `maxTextChars` | `4000` | 超过此长度的文案不翻译，直接显示原文。 |
 | `translateReason` | `true` | 没有 `displayReason` 时，翻译 `reason` 兜底。 |
 | `translateDisplayReason` | `true` | 翻译审批卡片实际显示的 `displayReason`。 |
+| `translateUserQuestions` | `true` | 翻译 `ask_user_question` 的题干、标题和选项说明；不翻译选项标签。 |
 | `debug` | `false` | 输出加载和翻译失败日志（不含原文内容）。 |
 | `glossary` | `{}` | 额外术语替换，例如 `{ "Host": "Host" }`。 |
 
 ## 隐私
 
-- 优先把**需要翻译的那段审批说明**发送到 Microsoft Edge 的匿名翻译端点（`edge.microsoft.com`），不需要账号或 API Key。
+- 优先把**需要翻译的审批说明或问答卡文本**发送到 Microsoft Edge 的匿名翻译端点（`edge.microsoft.com`），不需要账号或 API Key。
 - 如果 Bing 超过 `llmDelayMs` 未返回或失败，同一段文本会发给**当前会话使用的模型**做兜底翻译；这会消耗少量模型 token。把 `useLlm` 设为 `false` 可关闭。
 - 不会发送文件内容、完整会话、凭据或工具执行结果。
 - 只是显示层改写；原始审批理由仍保存在 DSH 的审计日志里。
@@ -102,7 +121,8 @@ dsh plugin --profile desktop add "D:\plugins\dsh-approval-zh"
 
 - 优先使用 `edge.microsoft.com`；Bing 慢或失败时会自动用当前会话模型兜底。只有两者都失败（或设置 `useLlm: false` 且 Bing 不可用）才显示英文原文。
 - Bing 超过 `llmDelayMs` 会触发模型翻译，可能产生少量 token 费用和额外 1–3 秒延迟。
-- 只翻译审批卡片的标题/说明；命令正文、工具详情面板、按钮文字跟随 DSH 自身的界面语言设置，不在本插件范围内。
+- 只翻译审批和问答卡的显示文本；命令正文、工具详情面板、按钮文字跟随 DSH 自身的界面语言设置，不在本插件范围内。
+- 问答卡的**选项标签**保持英文，因为它是回传给模型的答案值；只翻译题干、标题和选项说明。
 - 不翻译代码、JSON、路径、URL 和工具名；这些内容保持原样是有意设计。
 - 翻译会增加最多 `timeoutMs` 的显示延迟；命中缓存后基本无感。
 - 已经打开的审批弹窗不会追溯更新；更新插件源码后，如果行为仍是旧版，重启一次 DSH 以清除已加载的 Host 模块缓存。

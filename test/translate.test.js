@@ -9,6 +9,7 @@ import {
   restoreTechnical,
   splitDisplayText,
   translateApprovalRequest,
+  translateUserQuestionRequest,
 } from '../lib/translate.js'
 
 const SAMPLE =
@@ -268,4 +269,43 @@ test('translateApprovalRequest localizes the Auto review brand', async () => {
   })
   assert.equal(changed, true)
   assert.equal(request.displayReason, '自动审查拒绝了此调用：用户仅要求写配置文件。')
+})
+
+test('user-question translation keeps option labels as answer values', async () => {
+  const calls = []
+  const translator = {
+    async translate(text) {
+      calls.push(text)
+      return `中：${text}`
+    },
+  }
+  const request = {
+    questions: [
+      {
+        id: 'repo',
+        header: 'Choose',
+        question: 'Which repo?',
+        options: [
+          { label: "It's private", description: 'Anonymous requests cannot read private repos.' },
+          { label: 'Other repo', description: 'Tell me the correct owner and name.' },
+        ],
+      },
+    ],
+  }
+  const changed = await translateUserQuestionRequest(request, translator, {
+    translateUserQuestions: true,
+  })
+  assert.equal(changed, 4)
+  assert.equal(request.questions[0].question, '中：Which repo?')
+  assert.equal(request.questions[0].header, '中：Choose')
+  assert.equal(request.questions[0].options[0].label, "It's private")
+  assert.equal(request.questions[0].options[1].label, 'Other repo')
+  assert.equal(request.questions[0].options[0].description, '中：Anonymous requests cannot read private repos.')
+  assert.equal(request.questions[0].options[1].description, '中：Tell me the correct owner and name.')
+  assert.deepEqual([...calls].sort(), [
+    'Anonymous requests cannot read private repos.',
+    'Choose',
+    'Tell me the correct owner and name.',
+    'Which repo?',
+  ])
 })
