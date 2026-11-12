@@ -72,6 +72,14 @@ dsh plugin --profile desktop add "D:\plugins\dsh-approval-zh"
 
 `desktop` is the reserved profile of the desktop app; use the matching profile for Web/TUI.
 
+### From GitHub
+
+```sh
+dsh plugin --profile desktop add github:879745uhjun/dsh-approval-zh
+```
+
+Reload the Web UI page after installing.
+
 ## Configuration
 
 Override the row with id `dsh-approval-zh` in the profile's `cordis.patch.yml`:

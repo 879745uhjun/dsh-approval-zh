@@ -35,6 +35,15 @@
     "dsh": ">=0.2.2-rc.1 <0.3.0"
   },
   "license": "MIT",
+  "author": "879745uhjun",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/879745uhjun/dsh-approval-zh.git"
+  },
+  "homepage": "https://github.com/879745uhjun/dsh-approval-zh#readme",
+  "bugs": {
+    "url": "https://github.com/879745uhjun/dsh-approval-zh/issues"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

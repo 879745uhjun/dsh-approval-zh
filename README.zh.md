@@ -72,6 +72,14 @@ dsh plugin --profile desktop add "D:\plugins\dsh-approval-zh"
 
 `desktop` 是桌面版保留的 profile 名；Web/TUI 请换成对应 profile。
 
+### 方式三：从 GitHub 安装
+
+```sh
+dsh plugin --profile desktop add github:879745uhjun/dsh-approval-zh
+```
+
+装好后刷新 Web 页面。
+
 安装后确认：
 
 - 插件页出现 `dsh-approval-zh`；
