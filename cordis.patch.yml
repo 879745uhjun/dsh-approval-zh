@@ -10,8 +10,10 @@
         enabled: true
         target: zh-Hans
         timeoutMs: 8000
+        displayWaitMs: 4000
         llmDelayMs: 1200
         useLlm: true
+        minProseChars: 3
         translateReason: true
         translateDisplayReason: true
         translateUserQuestions: true

@@ -309,3 +309,153 @@ test('user-question translation keeps option labels as answer values', async () 
     'Which repo?',
   ])
 })
+
+test('degradation: both channels failing resolves the original text without throwing', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => {
+    throw new Error('network down')
+  }
+  try {
+    const llm = {
+      async *stream() {
+        throw new Error('model route down')
+        // Unreachable: keeps the generator shape valid.
+        yield { type: 'text-delta', text: '' }
+      },
+    }
+    const translator = createTranslator(
+      { timeoutMs: 3000, displayWaitMs: 1500, llmDelayMs: 100, useLlm: true, maxTextChars: 4000 },
+      { llm },
+    )
+    const agent = {
+      session: { id: 'session-degraded', requestHeader: () => ({ config: { provider: 'p', model: 'm' } }) },
+    }
+    const source = 'The user asked only to write the config file.'
+    const output = await translator.translate(source, undefined, agent)
+    assert.equal(output, source, 'the original English text must be returned, unchanged')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('degradation: a failed translation leaves the approval request untouched', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => {
+    throw new Error('network down')
+  }
+  try {
+    const translator = createTranslator(
+      { timeoutMs: 3000, displayWaitMs: 1200, llmDelayMs: 100, useLlm: false, maxTextChars: 4000 },
+      {},
+    )
+    const request = {
+      displayReason: { zh: '允许本次操作使用 danger-full-access 权限：Profile changes persist across sessions.' },
+      reason: 'escalate sandbox to danger-full-access: Profile changes persist across sessions.',
+    }
+    const before = { ...request }
+    let settled = false
+    const changed = await translateApprovalRequest(request, translator, {
+      translateDisplayReason: true,
+      translateReason: true,
+    }).finally(() => {
+      settled = true
+    })
+    assert.equal(changed, false)
+    assert.equal(settled, true, 'translation must settle rather than hang the approval')
+    assert.deepEqual(request, before)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('degradation: a hung channel cannot hold the approval past the display budget', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = () => new Promise(() => {})
+  try {
+    const llm = {
+      async *stream() {
+        await new Promise(() => {})
+        yield { type: 'text-delta', text: '' }
+      },
+    }
+    const translator = createTranslator(
+      { timeoutMs: 20000, displayWaitMs: 500, llmDelayMs: 100, useLlm: true, maxTextChars: 4000 },
+      { llm },
+    )
+    const agent = {
+      session: { id: 'session-hung', requestHeader: () => ({ config: { provider: 'p', model: 'm' } }) },
+    }
+    const source = 'Profile changes persist across sessions.'
+    const started = Date.now()
+    const output = await translator.translate(source, undefined, agent)
+    const elapsed = Date.now() - started
+    assert.equal(output, source)
+    assert.ok(elapsed < 2500, `expected the display budget to cap the wait, took ${elapsed}ms`)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('skip: a tool name plus JSON arguments is not worth a round trip', async () => {
+  const originalFetch = globalThis.fetch
+  let fetched = false
+  let modelled = false
+  globalThis.fetch = async () => {
+    fetched = true
+    return { ok: true, json: async () => [{ translations: [{ text: '不应发生' }] }] }
+  }
+  try {
+    const llm = {
+      async *stream() {
+        modelled = true
+        yield { type: 'text-delta', text: '不应发生' }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      },
+    }
+    const translator = createTranslator(
+      { timeoutMs: 3000, displayWaitMs: 1000, llmDelayMs: 100, useLlm: true, maxTextChars: 4000 },
+      { llm },
+    )
+    const agent = {
+      session: { id: 'session-skip', requestHeader: () => ({ config: { provider: 'p', model: 'm' } }) },
+    }
+    const source = 'plugin_manager {"action":"list_plugins","limit":50}'
+    assert.equal(await translator.translate(source, undefined, agent), source)
+    assert.equal(fetched, false)
+    assert.equal(modelled, false)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('degradation: the plugin listener still runs next() when translation fails', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => {
+    throw new Error('network down')
+  }
+  try {
+    const { apply } = await import('../index.js')
+    const handlers = []
+    const ctx = {
+      get: () => undefined,
+      on(event, fn, options) {
+        handlers.push({ event, fn, options })
+      },
+    }
+    apply(ctx, { timeoutMs: 3000, displayWaitMs: 800, llmDelayMs: 100, useLlm: false, debug: false })
+    const handler = handlers.find((item) => item.event === 'approval/request')
+    assert.ok(handler, 'the approval listener must be registered')
+    assert.deepEqual(handler.options, { prepend: true })
+    const request = { displayReason: { zh: '允许本次操作使用 danger-full-access 权限：Write the config file.' } }
+    let nextCalled = 0
+    const outcome = await handler.fn(request, async () => {
+      nextCalled += 1
+      return 'allowed-once'
+    })
+    assert.equal(nextCalled, 1, 'the waterfall must continue exactly once')
+    assert.equal(outcome, 'allowed-once')
+    assert.deepEqual(request.displayReason, { zh: '允许本次操作使用 danger-full-access 权限：Write the config file.' })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})

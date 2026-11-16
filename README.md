@@ -46,7 +46,7 @@ becomes Chinese in the question and description while the option label stays Eng
   - localized Chinese prefixes such as `允许本次操作使用 danger-full-access 权限：`;
   - tool names such as `plugin_manager` and `ops_bash`;
   - JSON/command arguments, inline code, URLs, Windows paths, and sandbox mode names.
-- Caches identical text in memory.
+- Caches identical text in memory, and skips text with nothing worth translating (already Chinese, or a tool name plus JSON arguments) at zero cost.
 - Starts with the anonymous Bing endpoint. If it is slower than `llmDelayMs` or fails, the current session model races it; the first successful translation wins and the other request is aborted.
 - If both paths fail, shows the original text and lets the approval continue. It never blocks or denies a call.
 - Does not modify `approval/asked` / `approval/decided` audit records; they keep the original English reason.
@@ -90,8 +90,10 @@ Override the row with id `dsh-approval-zh` in the profile's `cordis.patch.yml`:
     enabled: true
     target: zh-Hans
     timeoutMs: 8000
+    displayWaitMs: 4000
     llmDelayMs: 1200
     useLlm: true
+    minProseChars: 3
     translateReason: true
     translateDisplayReason: true
     translateUserQuestions: true
@@ -102,15 +104,32 @@ Override the row with id `dsh-approval-zh` in the profile's `cordis.patch.yml`:
 | --- | --- | --- |
 | `enabled` | `true` | Master switch; `false` loads no listener. |
 | `target` | `zh-Hans` | Target language passed to the translation endpoint. |
-| `timeoutMs` | `8000` | Overall deadline for the Bing/model race; the original text is shown on timeout. |
+| `timeoutMs` | `8000` | Hard deadline; cancels every in-flight request. |
+| `displayWaitMs` | `4000` | Display budget: the approval card waits at most this long, then shows the original text. Clamped to `≤ timeoutMs`. |
 | `llmDelayMs` | `1200` | Start the current-session model if Bing has not answered by then. |
 | `useLlm` | `true` | Allow the current-session model as fallback; `false` uses Bing only. |
 | `maxTextChars` | `4000` | Text longer than this is left untranslated. |
+| `minProseChars` | `3` | Skip when the text has fewer translatable letters once code, JSON, and tool names are removed. |
 | `translateReason` | `true` | Translate the `reason` fallback when `displayReason` is absent. |
 | `translateDisplayReason` | `true` | Translate the `displayReason` rendered by the approval card. |
 | `translateUserQuestions` | `true` | Translate `ask_user_question` questions, headers, and option descriptions; option labels stay unchanged. |
 | `debug` | `false` | Log load and failure events (never the source text). |
 | `glossary` | `{}` | Extra term replacements. |
+
+## Latency
+
+The approval card is blocking: it does not render until the translation settles.
+
+| Case | Card delay | Request sent |
+| --- | --- | --- |
+| Already Chinese | 0 ms | no |
+| Tool name + JSON only | 0 ms | no (`minProseChars`) |
+| Identical text cached | ≈0 ms | no |
+| Bing healthy (measured 0.16–0.9 s here) | 0.2–1 s | 1 anonymous request |
+| Bing slow (> `llmDelayMs`) | 1.2 s + model 1–3 s ≈ 2–4 s | anonymous + 1 model request |
+| Both channels fail or hang | `displayWaitMs` (4 s), then original text | yes, cut off by the budget |
+
+Normal cost is **0.2–1 s per approval**; the worst case is capped at `displayWaitMs` (4 s) instead of the former 8 s. Set `enabled: false` or lower `displayWaitMs` to remove the delay entirely.
 
 ## Privacy
 

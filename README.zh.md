@@ -46,7 +46,7 @@ Which repo?
   - 中文提示前缀，例如“允许本次操作使用 danger-full-access 权限：”；
   - 工具名，例如 `plugin_manager`、`ops_bash`；
   - JSON / 命令参数、反引号代码、URL、Windows 路径、`danger-full-access` 等模式名。
-- 内存缓存相同文案，避免每次审批都请求翻译。
+- 内存缓存相同文案，避免每次审批都请求翻译；纯中文、以及「工具名 + JSON 参数」这类没有可译散文的文案直接放行（0 耗时）。
 - 先请求匿名 Bing 端点；如果它超过 `llmDelayMs` 还没返回或直接失败，会同时用**当前会话的模型**翻译，谁先成功用谁，另一个立即取消。这样 Bing 慢或不可用时不会一直显示英文。
 - 两条通道都失败时**显示原文并继续审批**，不会阻塞、不会拒绝调用。
 - 不会修改 `approval/asked` / `approval/decided` 审计记录；审计里仍是原始英文。
@@ -95,8 +95,10 @@ dsh plugin --profile desktop add github:879745uhjun/dsh-approval-zh
     enabled: true
     target: zh-Hans
     timeoutMs: 8000
+    displayWaitMs: 4000
     llmDelayMs: 1200
     useLlm: true
+    minProseChars: 3
     translateReason: true
     translateDisplayReason: true
     translateUserQuestions: true
@@ -107,15 +109,32 @@ dsh plugin --profile desktop add github:879745uhjun/dsh-approval-zh
 | --- | --- | --- |
 | `enabled` | `true` | 总开关；设为 `false` 后完全不加载监听器。 |
 | `target` | `zh-Hans` | 目标语言，传给翻译端点。 |
-| `timeoutMs` | `8000` | 整次翻译（Bing + 模型竞速）的总超时；超时显示原文。 |
+| `timeoutMs` | `8000` | 硬超时：到点强制取消所有翻译请求。 |
+| `displayWaitMs` | `4000` | 显示预算：审批卡最多等这么久，到点先显示原文，绝不更久地卡住审批。会自动收敛到 `≤ timeoutMs`。 |
 | `llmDelayMs` | `1200` | Bing 超过这个时间还没返回时，启动当前会话模型一起翻译。 |
 | `useLlm` | `true` | 是否允许用当前会话模型兜底；设为 `false` 则只走 Bing。 |
 | `maxTextChars` | `4000` | 超过此长度的文案不翻译，直接显示原文。 |
+| `minProseChars` | `3` | 去掉代码/JSON/工具名后，可翻译字母少于这个数就跳过（默认只跳过近乎没有散文的文案）。 |
 | `translateReason` | `true` | 没有 `displayReason` 时，翻译 `reason` 兜底。 |
 | `translateDisplayReason` | `true` | 翻译审批卡片实际显示的 `displayReason`。 |
 | `translateUserQuestions` | `true` | 翻译 `ask_user_question` 的题干、标题和选项说明；不翻译选项标签。 |
 | `debug` | `false` | 输出加载和翻译失败日志（不含原文内容）。 |
 | `glossary` | `{}` | 额外术语替换，例如 `{ "Host": "Host" }`。 |
+
+## 耗时
+
+审批卡是**阻塞式**的：翻译没结束，卡片就不出现。各档位的实测/设计量级：
+
+| 情形 | 审批卡延迟 | 是否发请求 |
+| --- | --- | --- |
+| 纯中文 / 已是中文 | 0 ms | 否 |
+| 工具名 + JSON，无可译散文 | 0 ms | 否（`minProseChars`） |
+| 相同文案命中缓存 | ≈0 ms | 否 |
+| Bing 正常（本机实测 0.16–0.9 s） | 0.2–1 s | 1 次匿名请求 |
+| Bing 慢（> `llmDelayMs`） | 1.2 s + 模型 1–3 s ≈ 2–4 s | 匿名 + 1 次模型请求 |
+| Bing 与模型都失败/挂起 | `displayWaitMs`（默认 4 s）后显示原文 | 有，但被预算掐断 |
+
+也就是说：**正常情况下每次审批多 0.2–1 秒**；最坏情况被 `displayWaitMs` 封顶在 4 秒，不会出现 8 秒才弹窗。要完全去掉这点延迟，把 `enabled` 设为 `false` 或把 `displayWaitMs` 调到 800 左右。
 
 ## 隐私
 
