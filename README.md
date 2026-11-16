@@ -109,7 +109,7 @@ Override the row with id `dsh-approval-zh` in the profile's `cordis.patch.yml`:
 | `llmDelayMs` | `1200` | Start the current-session model if Bing has not answered by then. |
 | `useLlm` | `true` | Allow the current-session model as fallback; `false` uses Bing only. |
 | `maxTextChars` | `4000` | Text longer than this is left untranslated. |
-| `minProseChars` | `3` | Skip when the text has fewer translatable letters once code, JSON, and tool names are removed. |
+| `minProseChars` | `3` | Skip when the text has fewer translatable letters once code, JSON, and tool names are removed. A 2-letter word such as `OK` is skipped by design. |
 | `translateReason` | `true` | Translate the `reason` fallback when `displayReason` is absent. |
 | `translateDisplayReason` | `true` | Translate the `displayReason` rendered by the approval card. |
 | `translateUserQuestions` | `true` | Translate `ask_user_question` questions, headers, and option descriptions; option labels stay unchanged. |
@@ -130,6 +130,8 @@ The approval card is blocking: it does not render until the translation settles.
 | Both channels fail or hang | `displayWaitMs` (4 s), then original text | yes, cut off by the budget |
 
 Normal cost is **0.2–1 s per approval**; the worst case is capped at `displayWaitMs` (4 s) instead of the former 8 s. Set `enabled: false` or lower `displayWaitMs` to remove the delay entirely.
+
+> **Behaviour change (0.2.1):** with `useLlm: false` or no model service, Bing is the only channel and it is **now** bounded by `displayWaitMs` too. In 0.2.0 and earlier that mode had no Bing deadline, so a hung network waited for `timeoutMs`. This is intentional; there is no separate switch back to the old behaviour.
 
 ## Privacy
 

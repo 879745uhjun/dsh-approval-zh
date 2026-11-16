@@ -114,7 +114,7 @@ dsh plugin --profile desktop add github:879745uhjun/dsh-approval-zh
 | `llmDelayMs` | `1200` | Bing 超过这个时间还没返回时，启动当前会话模型一起翻译。 |
 | `useLlm` | `true` | 是否允许用当前会话模型兜底；设为 `false` 则只走 Bing。 |
 | `maxTextChars` | `4000` | 超过此长度的文案不翻译，直接显示原文。 |
-| `minProseChars` | `3` | 去掉代码/JSON/工具名后，可翻译字母少于这个数就跳过（默认只跳过近乎没有散文的文案）。 |
+| `minProseChars` | `3` | 去掉代码/JSON/工具名后，可翻译字母少于这个数就跳过。默认 3 只跳过近乎没有散文的文案，`OK` 这类 2 字母短词也会被跳过，属于预期取舍。 |
 | `translateReason` | `true` | 没有 `displayReason` 时，翻译 `reason` 兜底。 |
 | `translateDisplayReason` | `true` | 翻译审批卡片实际显示的 `displayReason`。 |
 | `translateUserQuestions` | `true` | 翻译 `ask_user_question` 的题干、标题和选项说明；不翻译选项标签。 |
@@ -135,6 +135,8 @@ dsh plugin --profile desktop add github:879745uhjun/dsh-approval-zh
 | Bing 与模型都失败/挂起 | `displayWaitMs`（默认 4 s）后显示原文 | 有，但被预算掐断 |
 
 也就是说：**正常情况下每次审批多 0.2–1 秒**；最坏情况被 `displayWaitMs` 封顶在 4 秒，不会出现 8 秒才弹窗。要完全去掉这点延迟，把 `enabled` 设为 `false` 或把 `displayWaitMs` 调到 800 左右。
+
+> **语义变化（0.2.1）**：`useLlm: false` 或模型服务不可用时只剩 Bing 一条通道，现在**同样**受 `displayWaitMs` 约束；0.2.0 及更早在该模式下对 Bing 没有上限，网络挂起会一直等到 `timeoutMs`。这是有意的修正，没有单独开关可以回到旧行为。
 
 ## 隐私
 
