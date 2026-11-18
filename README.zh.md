@@ -136,6 +136,8 @@ dsh plugin --profile desktop add github:879745uhjun/dsh-approval-zh
 
 也就是说：**正常情况下每次审批多 0.2–1 秒**；最坏情况被 `displayWaitMs` 封顶在 4 秒，不会出现 8 秒才弹窗。要完全去掉这点延迟，把 `enabled` 设为 `false` 或把 `displayWaitMs` 调到 800 左右。
 
+可靠性补强（0.2.2）：Bing 单次连接失败会**立即重试一次**；超过 300 字符的长理由会把模型通道的启动时间从 1.2 s 提前到 0.4 s；失败冷却从 60 s 缩短到 15 s，一次网络抖动不会让同一条文案锁死一分钟。
+
 > **语义变化（0.2.1）**：`useLlm: false` 或模型服务不可用时只剩 Bing 一条通道，现在**同样**受 `displayWaitMs` 约束；0.2.0 及更早在该模式下对 Bing 没有上限，网络挂起会一直等到 `timeoutMs`。这是有意的修正，没有单独开关可以回到旧行为。
 
 ## 隐私

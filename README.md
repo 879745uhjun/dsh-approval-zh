@@ -131,6 +131,8 @@ The approval card is blocking: it does not render until the translation settles.
 
 Normal cost is **0.2–1 s per approval**; the worst case is capped at `displayWaitMs` (4 s) instead of the former 8 s. Set `enabled: false` or lower `displayWaitMs` to remove the delay entirely.
 
+Resilience (0.2.2): a single dropped Bing connection is retried once immediately; reasons longer than 300 characters start the model channel at 0.4 s instead of 1.2 s; the failure cooldown dropped from 60 s to 15 s so one network blip cannot lock a prompt out of translation for a minute.
+
 > **Behaviour change (0.2.1):** with `useLlm: false` or no model service, Bing is the only channel and it is **now** bounded by `displayWaitMs` too. In 0.2.0 and earlier that mode had no Bing deadline, so a hung network waited for `timeoutMs`. This is intentional; there is no separate switch back to the old behaviour.
 
 ## Privacy

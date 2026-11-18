@@ -459,3 +459,47 @@ test('degradation: the plugin listener still runs next() when translation fails'
     globalThis.fetch = originalFetch
   }
 })
+
+test('retry: a single dropped connection is retried once', async () => {
+  const originalFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls += 1
+    if (calls === 1) throw new Error('ECONNRESET')
+    return { ok: true, json: async () => [{ translations: [{ text: '第一次失败，第二次成功。' }] }] }
+  }
+  try {
+    const translator = createTranslator(
+      { timeoutMs: 3000, displayWaitMs: 2000, llmDelayMs: 1200, useLlm: false, maxTextChars: 4000 },
+      {},
+    )
+    const output = await translator.translate('The first attempt drops the connection.')
+    assert.equal(output, '第一次失败，第二次成功。')
+    assert.equal(calls, 2, 'the endpoint must be asked exactly twice')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('retry: a permanently failing endpoint is not retried forever', async () => {
+  const originalFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls += 1
+    throw new Error('ECONNREFUSED')
+  }
+  try {
+    const translator = createTranslator(
+      { timeoutMs: 3000, displayWaitMs: 2000, llmDelayMs: 1200, useLlm: false, maxTextChars: 4000 },
+      {},
+    )
+    const source = 'The endpoint is down for good.'
+    assert.equal(await translator.translate(source), source)
+    assert.equal(calls, 2, 'one attempt plus one retry')
+    const before = calls
+    assert.equal(await translator.translate(source), source)
+    assert.equal(calls, before, 'the failure cooldown must suppress an immediate retry')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
