@@ -121,6 +121,22 @@ dsh plugin --profile desktop add github:879745uhjun/dsh-approval-zh
 | `debug` | `false` | 输出加载和翻译失败日志（不含原文内容）。 |
 | `glossary` | `{}` | 额外术语替换，例如 `{ "Host": "Host" }`。 |
 
+## 自检
+
+设置 → 插件 → 选中 `dsh-approval-zh`，详情页底部有「自检」区块（`plugins.detail.section`，id `dsh-approval-zh.selftest`，order 90）。
+
+**只在点击「运行自检」时运行**，不会在打开详情页时自动发请求。四项检查各 2 秒超时、互不阻塞：
+
+| 检查 | 通过条件 |
+| --- | --- |
+| 配置可读 | `enabled=true`、`target` 非空、`timeoutMs` 合法；失败时写明哪一项不对 |
+| 翻译探针 | 对固定英文 `Allow this operation to use danger-full-access?` 走一次真实 `translate`，返回非空且与原文不同 |
+| 两条通道 | Bing 或模型任一成功即通过；都失败时给出各自原因（无会话时模型标记为「跳过」） |
+| 缓存命中 | 同一句第二次调用耗时 < 100 ms 且结果一致 |
+
+- 探针**不写审计记录、不触发审批**：只调用翻译器，不经过 `approval` 服务。
+- 结果只存在组件内存；「复制结果」输出 Markdown（`- [x] 标签 — 通过` / `- [ ] 标签 — 失败：原因`）。
+
 ## 耗时
 
 审批卡是**阻塞式**的：翻译没结束，卡片就不出现。各档位的实测/设计量级：

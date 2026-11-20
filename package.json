@@ -1,7 +1,7 @@
 {
   "name": "dsh-approval-zh",
-  "version": "0.2.2",
-  "description": "Automatically translate DeepSeek Harness approval prompts and ask_user_question cards to Chinese without changing decisions or option answer values.",
+  "version": "0.3.0",
+  "description": "Automatically translate DeepSeek Harness approval prompts and ask_user_question cards to Chinese without changing decisions or option answer values, with a self-test section on its plugin detail page.",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -15,11 +15,13 @@
   "main": "index.js",
   "exports": {
     ".": "./index.js",
+    "./client": "./client.js",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "index.js",
+    "client.js",
     "lib",
     "locale",
     "cordis.patch.yml",
@@ -28,25 +30,25 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node test/translate.test.js",
+    "pretest": "node --check index.js && node --check client.js",
+    "test": "node --test test/*.test.*",
     "test:live": "node test/live.mjs"
   },
   "engines": {
     "dsh": ">=0.2.2-rc.1 <0.3.0"
   },
   "license": "MIT",
-  "author": "879745uhjun",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/879745uhjun/dsh-approval-zh.git"
-  },
-  "homepage": "https://github.com/879745uhjun/dsh-approval-zh#readme",
-  "bugs": {
-    "url": "https://github.com/879745uhjun/dsh-approval-zh/issues"
-  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-client-locale"
+      ]
     }
   }
 }

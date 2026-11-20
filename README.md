@@ -116,6 +116,22 @@ Override the row with id `dsh-approval-zh` in the profile's `cordis.patch.yml`:
 | `debug` | `false` | Log load and failure events (never the source text). |
 | `glossary` | `{}` | Extra term replacements. |
 
+## Self-test
+
+Settings → Plugins → select `dsh-approval-zh`: its detail page ends with a **Self-test** section (`plugins.detail.section`, id `dsh-approval-zh.selftest`, order 90).
+
+It runs **only when you press Run self-test** — opening the page sends no request. Four checks, each with its own 2-second budget and no cross-blocking:
+
+| Check | Passes when |
+| --- | --- |
+| Configuration | `enabled=true`, `target` non-empty, `timeoutMs` valid; the failing field is named |
+| Translation probe | the fixed sentence `Allow this operation to use danger-full-access?` goes through the real `translate` and comes back non-empty and different |
+| Both channels | Bing or the model succeeded; when both fail each reason is shown (the model is marked skipped without a session) |
+| Cache hit | the same sentence twice: the second call is under 100 ms and identical |
+
+- The probe **writes no audit record and opens no approval**: it only calls the translator.
+- Results live in component memory; **Copy results** produces Markdown (`- [x] label — passed` / `- [ ] label — failed: reason`).
+
 ## Latency
 
 The approval card is blocking: it does not render until the translation settles.

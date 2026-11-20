@@ -15,6 +15,7 @@ import {
   translateApprovalRequest,
   translateUserQuestionRequest,
 } from './lib/translate.js'
+import { createSelfTest, createSelfTestHandler, SELFTEST_ROUTE } from './lib/selftest.js'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'dsh-approval-zh'
@@ -87,6 +88,25 @@ export function apply(ctx, input) {
     }
   }
   const translator = createTranslator(config, { getLlm })
+  /** Resolve any live session that can supply a model route for the self-test. */
+  const getAgent = () => {
+    try {
+      const service = ctx.get('sessions')
+      const sessions = typeof service?.list === 'function' ? service.list() : []
+      for (const session of sessions) {
+        try {
+          const header = session?.requestHeader?.()
+          if (header?.config?.provider && header?.config?.model) return { session }
+        } catch {
+          // A session without a usable header is simply not a candidate.
+        }
+      }
+    } catch {
+      // No session registry: the model channel stays unavailable.
+    }
+    return undefined
+  }
+  const selfTest = createSelfTest({ config, translator, getAgent })
   ctx.on(
     'approval/request',
     async (request, next) => {
@@ -117,6 +137,17 @@ export function apply(ctx, input) {
       { prepend: true },
     )
   }
+  if (typeof ctx.inject === 'function') ctx.inject(['webServer'], (scope) => {
+    scope.effect(
+      () =>
+        scope.webServer.register({
+          kind: 'exact',
+          path: SELFTEST_ROUTE,
+          handler: createSelfTestHandler({ selfTest }),
+        }),
+      'dsh-approval-zh: self-test route',
+    )
+  })
   if (config.debug) {
     console.log(
       `[dsh-approval-zh] loaded; target=${config.target}, timeout=${config.timeoutMs}ms, llm=${config.useLlm && getLlm() !== undefined}`,
