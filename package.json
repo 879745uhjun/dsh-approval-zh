@@ -1,6 +1,6 @@
 {
   "name": "dsh-approval-zh",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Automatically translate DeepSeek Harness approval prompts and ask_user_question cards to Chinese without changing decisions or option answer values, with a self-test section on its plugin detail page.",
   "keywords": [
     "dsh",

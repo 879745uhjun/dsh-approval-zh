@@ -170,3 +170,45 @@ test('the route handler answers one check and refuses a foreign origin', async (
   await handler({ method: 'POST', url: '/approval-zh/selftest', headers: {} }, noPost)
   assert.equal(noPost.record.status, 405)
 })
+
+test('a slow model channel does not fail the check when Bing already answered', async () => {
+  const selfTest = createSelfTest({
+    config: CONFIG,
+    timeoutMs: 400,
+    translator: {
+      async translate(text) {
+        return `译：${text}`
+      },
+      async probe(_source, _signal, _agent, waitMs) {
+        // Bing answers at once; the model never settles inside the window.
+        await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs ?? 400, 20)))
+        return { bing: { ok: true, ms: 8 }, llm: { pending: true, detail: '未在时限内返回' } }
+      },
+    },
+  })
+  const row = await selfTest.runOne('channels')
+  assert.equal(row.ok, true)
+  assert.match(row.detail, /Bing 通过 8ms/)
+  assert.match(row.detail, /模型 未在时限内返回/)
+})
+
+test('both channels failing keeps the check red and names each reason', async () => {
+  const selfTest = createSelfTest({
+    config: CONFIG,
+    translator: {
+      async translate(text) {
+        return text
+      },
+      async probe() {
+        return {
+          bing: { ok: false, ms: 30, detail: 'HTTP 429' },
+          llm: { ok: false, ms: 50, detail: 'AUTH' },
+        }
+      },
+    },
+  })
+  const row = await selfTest.runOne('channels')
+  assert.equal(row.ok, false)
+  assert.match(row.detail, /Bing 失败（HTTP 429）/)
+  assert.match(row.detail, /模型 失败（AUTH）/)
+})
